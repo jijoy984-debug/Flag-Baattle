@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flags Battle LIVE</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font-family:system-ui,Arial,sans-serif;overflow:hidden}
+  #stage{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 38%,#1a2340 0%,#0b0f1a 55%,#060810 100%);overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  .box{position:absolute;background:linear-gradient(160deg,#141a2ecc,#0a0d18cc);border:1px solid #4ea1ff33;border-radius:12px;padding:8px 12px;font-size:15px;backdrop-filter:blur(6px);box-shadow:0 4px 18px #0007}
+  /* Phone view: shrink the stage into a 9:16 frame, like a phone viewer sees on YouTube */
+  body.phone{background:#000}
+  body.phone #stage{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(100vw,56.25vh);height:min(177.78vw,100vh);
+    border-radius:16px;box-shadow:0 0 0 3px #333,0 0 40px #000c;
+  }
+  body.phone .box{font-size:11px;padding:5px 8px;border-radius:7px}
+  body.phone #top{font-size:14px}
+  body.phone #top small{font-size:10px}
+  body.phone #win h2{font-size:30px}
+  body.phone #win img{width:150px}
+  body.phone #feed{width:62%}
+  body.phone #cta{font-size:12px;top:100px}
+  body.phone #likebar{width:120px;font-size:9px}
+  body.phone #board{min-width:100px}
+  #eye{position:absolute;top:8px;right:8px;z-index:20;background:#000a;border:0;color:#fff;
+       width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;opacity:.85}
+  #info.danger{color:#ff4d4d;font-weight:700;animation:pulse 0.6s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  #shake{animation:shk 0.35s}
+  @keyframes shk{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(4px,4px)}}
+  #win{transition:none}
+  body.hideui #setup,body.hideui #ctl{display:none !important}   /* hides setup panel + the whole controls bar (flags, fullscreen, phone, sound, voice); top info, board, feed, champ stay visible */
+  #top{top:8px;left:50%;transform:translateX(-50%);text-align:center;font-size:22px;font-weight:800;
+       background:linear-gradient(90deg,#ffd54a,#ff6b8a,#4ea1ff);-webkit-background-clip:text;background-clip:text;
+       color:transparent;text-shadow:0 0 18px #4ea1ff55;letter-spacing:.5px}
+  #top small{display:block;font-weight:500;font-size:13px;opacity:.9;color:#cfe3ff;-webkit-text-fill-color:#cfe3ff;text-shadow:none}
+  #board{bottom:64px;left:8px;min-width:120px;font-size:11px;padding:5px 9px;line-height:1.35}
+  #cta{top:96px;left:50%;transform:translateX(-50%);text-align:center;font-size:16px;font-weight:700;
+       padding:7px 18px;white-space:nowrap;opacity:0;transition:opacity .5s ease}
+  #cta.show{opacity:1}
+  #likebar{bottom:64px;right:8px;width:170px;font-size:11px}
+  #likebar .bar{height:7px;background:#ffffff22;border-radius:4px;overflow:hidden;margin-top:4px}
+  #likebar .fill{height:100%;background:linear-gradient(90deg,#ff4d6d,#ffd54a);width:0%;transition:width .6s}
+  #ytchat{top:64px;right:8px;width:300px;height:38vh;padding:0;overflow:hidden;display:none}
+  #ytchat iframe{width:100%;height:100%;border:0;border-radius:11px}
+  #ytchat .lbl{position:absolute;top:-2px;left:8px;background:#0b0f1acc;font-size:10px;padding:2px 8px;border-radius:0 0 6px 6px;opacity:.85}
+  body.phone #ytchat{width:70%;height:26vh}
+  #board b{color:#ffd54a;font-size:12px}
+  #board div{white-space:nowrap}
+  #feed{bottom:8px;right:8px;width:300px;font-size:14px}
+  #feed b{color:#ff6b8a}
+  #feed div{margin:2px 0}
+  #champ{bottom:8px;left:8px;font-weight:700;color:#ffd54a;text-shadow:0 0 10px #ffd54a66}
+  #win{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+       background:radial-gradient(ellipse at 50% 45%,#2a2410cc 0%,#000c 65%);text-align:center;font-size:26px}
+  #win img{width:280px;height:auto;border-radius:6px;box-shadow:0 0 70px #ffd54a,0 0 140px #ffd54a55;margin:12px;border:3px solid #ffd54a}
+  #win h2{font-size:52px;margin:4px;background:linear-gradient(90deg,#ffd54a,#fff,#ffd54a);-webkit-background-clip:text;
+          background-clip:text;color:transparent;text-shadow:0 0 30px #ffd54a99}
+  #final{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%) scale(.4);z-index:15;
+         font-family:system-ui,Arial,sans-serif;font-weight:900;letter-spacing:2px;text-align:center;
+         opacity:0;pointer-events:none;-webkit-text-stroke:2px #3a0000}
+  #final .big{display:block;font-size:64px;line-height:1;
+         background:linear-gradient(180deg,#fff 0%,#ffd8d8 25%,#ff5252 55%,#ff0000 100%);
+         -webkit-background-clip:text;background-clip:text;color:transparent;
+         filter:drop-shadow(0 0 10px #ff2a2a) drop-shadow(0 0 28px #ff0000cc) drop-shadow(0 0 60px #ff000088);}
+  #final .sub{display:block;font-size:16px;font-weight:700;letter-spacing:6px;color:#ffdede;margin-top:2px;
+         text-shadow:0 0 10px #ff4d4d;-webkit-text-stroke:0;opacity:.9}
+  #final.show{animation:finalPop 1.5s cubic-bezier(.16,1.8,.3,1) forwards}
+  #final.show .big{animation:finalShake .45s ease-in-out .28s 2}
+  @keyframes finalPop{
+    0%{opacity:0;transform:translate(-50%,-55%) scale(.25) rotate(-6deg)}
+    18%{opacity:1;transform:translate(-50%,-55%) scale(1.25) rotate(2deg)}
+    30%{transform:translate(-50%,-55%) scale(0.96) rotate(-1deg)}
+    40%{transform:translate(-50%,-55%) scale(1.04) rotate(0.5deg)}
+    50%{transform:translate(-50%,-55%) scale(1) rotate(0deg)}
+    85%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,-55%) scale(1.06)}
+  }
+  @keyframes finalShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-.6deg)}75%{transform:translateX(3px) rotate(.6deg)}}
+  #flash{position:absolute;inset:0;pointer-events:none;z-index:14;background:#ff1a1a;opacity:0}
+  #flash.hit{animation:flashhit .35s ease-out}
+  @keyframes flashhit{0%{opacity:.55}100%{opacity:0}}
+  #vignette{position:absolute;inset:0;pointer-events:none;z-index:5;opacity:0;transition:opacity .8s}
+  #vignette.on{opacity:1;background:radial-gradient(ellipse at center,transparent 40%,#ff000040 100%);
+    animation:vpulse 1.1s ease-in-out infinite}
+  @keyframes vpulse{0%,100%{opacity:.5}50%{opacity:1}}
+  #setup{top:70px;right:8px;width:290px;display:none}
+  #setup input{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:6px;border-radius:6px;border:0}
+  button,select{font-size:15px;padding:7px 12px;border-radius:8px;border:0;cursor:pointer}
+  #ctl{top:8px;right:8px;padding:6px}
+</style>
+</head>
+<body>
+<div id="stage">
+<canvas id="c"></canvas>
+
+<button id="eye" title="Hide all controls (E)">👁</button>
+<div class="box" id="top">🚩 FLAGS BATTLE LIVE<small id="info"></small></div>
+<div class="box" id="board"></div>
+<div class="box" id="feed"><b>💬 Comment a country = +1 ❤</b></div>
+<div class="box" id="champ"></div>
+<div class="box" id="cta"></div>
+<div class="box" id="likebar" style="display:none"></div>
+<div class="box" id="ytchat"><span class="lbl">💬 Live chat</span><iframe id="ytchatframe"></iframe></div>
+<div id="final"></div>
+<div id="flash"></div>
+<div id="vignette"></div>
+
+<div class="box" id="ctl">
+  <select id="n"><option value="60">60 flags</option><option value="100">100 flags</option><option value="195" selected>All flags</option></select>
+  <button id="full" title="Fullscreen (F)">⛶</button><button id="phone" title="Phone view (P)">📱</button><button id="snd" title="Sound effects">🔊</button><button id="voc" title="Voice announcer">🗣</button>
+  <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6" style="width:70px;vertical-align:middle" title="Volume">
+  <button id="gear">⚙ Setup</button>
+</div>
+
+<div class="box" id="setup">
+  <label>YouTube Stream URL</label><input id="vid" placeholder="https://youtube.com/watch?v=... or /live/...">
+  <label>Session length (hours)</label><input id="hrs" type="number" value="5" min="0.1" step="0.5">
+  <label><input id="chaton" type="checkbox" checked style="width:auto;vertical-align:middle"> Show real YouTube comments on screen</label>
+  <div id="advToggle" style="font-size:12px;opacity:.75;text-decoration:underline;cursor:pointer;margin:4px 0">⚙ Advanced: enable country→life sync</div>
+  <div id="advBox" style="display:none">
+    <label>YouTube API key <span style="opacity:.6">(only needed for the +1 life feature)</span></label>
+    <input id="key" type="password" placeholder="AIza...">
+  </div>
+  <label>Like goal (for the progress bar)</label><input id="likegoal" type="number" value="1000" min="1">
+  <label><input id="ctaon" type="checkbox" checked style="width:auto;vertical-align:middle"> Show rotating Like/Subscribe/Comment/Share reminders</label>
+  <button id="conn">Save &amp; Start</button>
+  <div id="status" style="margin:8px 0;font-size:13px">Chat: not connected</div>
+  <label>Announcer voice</label><select id="vsel" style="width:100%;margin:4px 0 6px"></select>
+  <button id="vtest">Test voice</button>
+  <label style="display:block;margin-top:8px">Test comment (fake viewer)</label>
+  <input id="test" placeholder="type: bangladesh  then Enter">
+  <div style="font-size:12px;opacity:.8">Press <b>H</b> to hide/show all controls (for OBS).</div>
+</div>
+
+</div><!-- /#stage -->
+
+<div id="win"><div id="wround"></div><img id="wimg"><h2 id="wname"></h2><div>👑 CHAMPION 👑</div></div>
+
+<script>
+/* ================= SETTINGS (edit these) ================= */
+const HOLE_START = 8;      // seconds before holes open
+const HOLE_EVERY = 6;      // seconds between new holes
+const MAX_HOLES  = 7;
+const SPIN       = 0.6;    // arena rotation speed
+const MAX_LIVES  = 3;      // max extra lives per flag
+const SUDDEN_DEATH = 180;  // seconds; after this, extra lives stop working
+const USER_COOLDOWN = 30;  // seconds between lives from the same viewer
+const POLL_MS    = 10000;  // chat poll interval (see quota note)
+const WIN_SHOW_MS = 6000;  // champion screen time between rounds
+
+/* ================= COUNTRIES ================= */
+const LIST = `us:USA,gb:United Kingdom,fr:France,de:Germany,it:Italy,es:Spain,pt:Portugal,nl:Netherlands,be:Belgium,ch:Switzerland,at:Austria,se:Sweden,no:Norway,dk:Denmark,fi:Finland,ie:Ireland,pl:Poland,cz:Czechia,hu:Hungary,ro:Romania,bg:Bulgaria,gr:Greece,tr:Turkey,ru:Russia,ua:Ukraine,rs:Serbia,hr:Croatia,is:Iceland,ca:Canada,mx:Mexico,br:Brazil,ar:Argentina,cl:Chile,co:Colombia,pe:Peru,ve:Venezuela,uy:Uruguay,py:Paraguay,bo:Bolivia,ec:Ecuador,cu:Cuba,jm:Jamaica,cn:China,jp:Japan,kr:South Korea,kp:North Korea,in:India,bd:Bangladesh,pk:Pakistan,lk:Sri Lanka,np:Nepal,af:Afghanistan,ir:Iran,iq:Iraq,sa:Saudi Arabia,ae:UAE,qa:Qatar,kw:Kuwait,om:Oman,jo:Jordan,lb:Lebanon,sy:Syria,il:Israel,ps:Palestine,eg:Egypt,ly:Libya,tn:Tunisia,dz:Algeria,ma:Morocco,ng:Nigeria,gh:Ghana,ke:Kenya,et:Ethiopia,za:South Africa,tz:Tanzania,ug:Uganda,sn:Senegal,ci:Ivory Coast,cm:Cameroon,sd:Sudan,th:Thailand,vn:Vietnam,my:Malaysia,sg:Singapore,id:Indonesia,ph:Philippines,mm:Myanmar,kh:Cambodia,la:Laos,mn:Mongolia,kz:Kazakhstan,uz:Uzbekistan,au:Australia,nz:New Zealand,fj:Fiji,mv:Maldives,bt:Bhutan,az:Azerbaijan,ge:Georgia,am:Armenia,by:Belarus,sk:Slovakia,si:Slovenia,lt:Lithuania,lv:Latvia,ee:Estonia,al:Albania,mk:North Macedonia,ba:Bosnia,me:Montenegro,cy:Cyprus,mt:Malta,lu:Luxembourg,pa:Panama,cr:Costa Rica,gt:Guatemala,hn:Honduras,sv:El Salvador,ni:Nicaragua,do:Dominican Rep.,ht:Haiti,zw:Zimbabwe,zm:Zambia,ao:Angola,mz:Mozambique,mg:Madagascar,ye:Yemen,bh:Bahrain,so:Somalia,rw:Rwanda,bw:Botswana,na:Namibia,ml:Mali,ne:Niger,td:Chad,cd:DR Congo,cg:Congo,ga:Gabon,tm:Turkmenistan,kg:Kyrgyzstan,tj:Tajikistan,bn:Brunei,tl:Timor-Leste,pg:Papua New Guinea`
+  .split(',').map(s=>{const [c,n]=s.split(':');return {code:c,name:n}});
+const BYCODE={};LIST.forEach(f=>BYCODE[f.code]=f);
+// extra words viewers might type -> country code
+const ALIAS={'united states':'us',america:'us',uk:'gb',england:'gb',britain:'gb','great britain':'gb','united kingdom':'gb',
+ emirates:'ae','united arab emirates':'ae',korea:'kr',czech:'cz','czech republic':'cz','cote d ivoire':'ci',drc:'cd',
+ 'democratic republic of the congo':'cd',bangla:'bd',turkiye:'tr',holland:'nl',burma:'mm',macedonia:'mk',
+ 'dominican republic':'do','saudi':'sa',switzerland:'ch',ksa:'sa',uae:'ae',usa:'us'};
+
+/* ================= IMAGES (loaded once, reused all session) ================= */
+const IMG={};
+LIST.forEach(f=>{const i=new Image();i.src=`https://flagcdn.com/w80/${f.code}.png`;IMG[f.code]=i});
+
+/* ================= STATE ================= */
+const $=id=>document.getElementById(id);
+const cv=$('c'),ctx=cv.getContext('2d');
+let W,H,R,cx,cy,flags=[],holes=[],rot=0,t=0,phase='idle',round=0,lastOut=null,sessionEnd=0,last=0,lastMilestone=999;
+const STARS=Array.from({length:90},()=>({a:Math.random()*6.283,d:Math.random(),s:0.4+Math.random()*1.3,tw:Math.random()*6.283}));
+let wins={};try{wins=JSON.parse(localStorage.getItem('fbwins')||'{}')}catch(e){}
+let lastChamp=null;
+const stage=$('stage');
+function resize(){
+  const rect=stage.getBoundingClientRect();
+  W=cv.width=Math.max(1,rect.width);H=cv.height=Math.max(1,rect.height);
+  R=Math.min(W,H)*(document.body.classList.contains('phone')?0.34:0.40);
+  cx=W/2;cy=H/2+(document.body.classList.contains('phone')?0:10);
+}
+addEventListener('resize',resize);
+new ResizeObserver(resize).observe(stage);
+resize();
+
+/* ================= SOUND EFFECTS + VOICE ANNOUNCER ================= */
+let AC=null,soundOn=true,voiceOn=true,vol=0.6,sdDone=false,lastFallSfx=0,lastSaveSfx=0;
+function ac(){
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+  if(AC&&AC.state==='suspended')AC.resume();
+  return AC;
+}
+function tone(freq,dur,type='sine',gain=0.25,delay=0,slide=0){
+  if(!soundOn)return;const a=ac();if(!a)return;
+  const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+delay;
+  o.type=type;o.frequency.setValueAtTime(freq,t0);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t0+dur);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,gain*vol),t0+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+dur+0.05);
+}
+const SFX={
+  start(){[392,523,659,784].forEach((f,i)=>tone(f,0.16,'triangle',0.3,i*0.1))},           // round start
+  hole(){tone(220,0.5,'sawtooth',0.18,0,-140);tone(110,0.5,'square',0.1,0.05,-50)},         // hole opens
+  life(){tone(660,0.12,'sine',0.3);tone(990,0.2,'sine',0.3,0.09)},                          // comment = +1 life
+  save(){const n=performance.now();if(n-lastSaveSfx<120)return;lastSaveSfx=n;tone(520,0.14,'square',0.12,0,260)}, // life used
+  fall(){const n=performance.now();if(n-lastFallSfx<70)return;lastFallSfx=n;tone(480,0.3,'sine',0.14,0,-380)},   // flag falls
+  siren(){for(let i=0;i<4;i++)tone(i%2?600:900,0.22,'square',0.14,i*0.24)},                 // sudden death
+  milestone(){                                                                              // FINAL X banner hit
+    tone(80,0.5,'sine',0.35,0,-20);                       // bass thud
+    [1200,900,1200].forEach((f,i)=>tone(f,0.16,'square',0.22,0.06+i*0.15));
+    tone(1600,0.4,'sine',0.15,0.3,600);
+  },
+  win(){                                                                                    // champion fanfare
+    [523,659,784,1047].forEach((f,i)=>tone(f,0.25,'triangle',0.35,i*0.14));
+    [523,659,784,1047].forEach(f=>tone(f,1.1,'sawtooth',0.1,0.65));
+    tone(1568,0.6,'sine',0.25,0.7);
+  },
+  cta(){tone(880,0.1,'sine',0.16);tone(1180,0.16,'sine',0.14,0.07)}                          // action-banner chime
+};
+let VCHOICE='';try{VCHOICE=localStorage.getItem('fbvoice')||''}catch(e){}
+const MALE=/david|mark|george|james|guy|ryan|male|daniel|alex|fred|thomas|richard|eric|liam|brian|davis|christopher|roger/i;
+const FEMALE=/aria|jenny|sonia|libby|natasha|michelle|ana\b|emma|zira|samantha|karen|moira|tessa|serena|susan|hazel|female|amy|joanna|salli|kendra|kimberly|ivy|google us english|google uk english female/i;
+function pickVoice(){
+  const vs=speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));
+  if(VCHOICE){const c=vs.find(v=>v.name===VCHOICE);if(c)return c}
+  const score=v=>(/natural|neural|online/i.test(v.name)?100:0)+(FEMALE.test(v.name)?50:0)-(MALE.test(v.name)?200:0)+(/en-US/i.test(v.lang)?5:0);
+  return vs.sort((a,b)=>score(b)-score(a))[0]||null;
+}
+function speak(text){
+  if(!voiceOn||!soundOn||!('speechSynthesis' in window))return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.rate=1.0;u.pitch=1.15;u.volume=vol;
+    const v=pickVoice();if(v)u.voice=v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+// Best quality: play a pre-made human-like recording voices/<code>.mp3 (made with make_voices.py).
+// If the file is missing, fall back to the browser voice above.
+let curAudio=null;
+function announceWinner(f){
+  if(!voiceOn||!soundOn)return;
+  const fallback=()=>speak(`Round ${round} complete! The champion is ${f.name.replace('Rep.','Republic')}!`);
+  try{
+    if(curAudio)curAudio.pause();
+    const a=new Audio(`voices/${f.code}.mp3`);a.volume=vol;curAudio=a;
+    a.onerror=fallback;
+    a.play().catch(()=>{});
+  }catch(e){fallback()}
+}
+
+
+/* ================= EYE-CANDY: particles, flying hearts, shake ================= */
+let particles=[],hearts=[],confetti=[],shockwaves=[];
+function burst(x,y,color,n,speed=220){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.283,sp=speed*(0.4+Math.random()*0.8);
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,color,size:2+Math.random()*3});
+  }
+}
+function popText(x,y,text,color='#fff'){
+  particles.push({x,y,vx:0,vy:-40,life:1,text,color,txt:true});
+}
+function spawnHeart(fromX,fromY,toX,toY){
+  hearts.push({x:fromX,y:fromY,sx:fromX,sy:fromY,tx:toX,ty:toY,t:0,dur:0.55});
+}
+function spawnShockwave(color='#ff2a2a'){shockwaves.push({r:0,a:1,color})}
+function spawnConfetti(){
+  const colors=['#ff4d6d','#ffd54a','#4ea1ff','#5cff8a','#c77dff'];
+  for(let i=0;i<120;i++){
+    confetti.push({x:cx+(Math.random()-0.5)*40,y:cy-R*0.4,vx:(Math.random()-0.5)*260,
+      vy:-200-Math.random()*220,g:420,rot:Math.random()*6.283,vr:(Math.random()-0.5)*10,
+      color:colors[i%colors.length],life:1,size:5+Math.random()*4});
+  }
+}
+function updateFX(dt){
+  particles=particles.filter(p=>p.life>0);
+  for(const p of particles){
+    p.life-=dt*(p.txt?0.8:1.6);
+    if(!p.txt){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=0.94;p.vy*=0.94;}
+    else p.y+=p.vy*dt;
+  }
+  hearts=hearts.filter(h=>h.t<h.dur);
+  for(const h of hearts){
+    h.t+=dt;const k=Math.min(1,h.t/h.dur),e=1-Math.pow(1-k,3);
+    h.x=h.sx+(h.tx-h.sx)*e;h.y=h.sy+(h.ty-h.sy)*e-Math.sin(k*3.14)*40;
+  }
+  confetti=confetti.filter(c=>c.life>0);
+  for(const c of confetti){
+    c.vy+=c.g*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.rot+=c.vr*dt;
+    if(c.y>H+20)c.life=0;
+  }
+  shockwaves=shockwaves.filter(w=>w.a>0.01);
+  for(const w of shockwaves){w.r+=dt*(R*2.2);w.a-=dt*1.1;}
+}
+function drawFX(){
+  ctx.save();ctx.translate(cx,cy);
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life);
+    if(p.txt){ctx.fillStyle=p.color;ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillText(p.text,p.x,p.y)}
+    else{ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,7);ctx.fill()}
+  }
+  ctx.globalAlpha=1;
+  for(const h of hearts){
+    ctx.font='20px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('❤️',h.x,h.y);
+  }
+  ctx.restore();
+  if(confetti.length){
+    ctx.save();
+    for(const c of confetti){
+      ctx.save();ctx.globalAlpha=Math.min(1,c.life);ctx.translate(c.x,c.y);ctx.rotate(c.rot);
+      ctx.fillStyle=c.color;ctx.fillRect(-c.size/2,-c.size/2,c.size,c.size*1.6);ctx.restore();
+    }
+    ctx.restore();
+  }
+  if(shockwaves.length){
+    ctx.save();ctx.translate(cx,cy);
+    for(const w of shockwaves){
+      ctx.globalAlpha=Math.max(0,w.a)*0.7;
+      ctx.lineWidth=6;ctx.strokeStyle=w.color;ctx.shadowColor=w.color;ctx.shadowBlur=20;
+      ctx.beginPath();ctx.arc(0,0,w.r,0,7);ctx.stroke();
+    }
+    ctx.restore();ctx.globalAlpha=1;
+  }
+}
+function shakeScreen(ms=280){
+  const el=$('stage');
+  el.style.animation='none';void el.offsetWidth;
+  el.style.animation=`shk ${ms}ms`;
+  setTimeout(()=>{el.style.animation=''},ms+20);
+}
+
+
+/* ================= ENGAGEMENT: CTA ticker + live like/view stats ================= */
+const CTAS=[
+  "👍 Smash that LIKE button!",
+  "🔔 Not subscribed yet? Hit SUBSCRIBE!",
+  "💬 Comment your COUNTRY for +1 life!",
+  "↗️ SHARE this live with a friend!",
+  "🔥 Who's going to win this round?"
+];
+let ctaIdx=0,ctaTimer=null,ctaOn=true;
+function showCTA(){
+  if(!ctaOn){$('cta').classList.remove('show');return}
+  const el=$('cta');el.classList.remove('show');
+  setTimeout(()=>{el.textContent=CTAS[ctaIdx%CTAS.length];ctaIdx++;el.classList.add('show');SFX.cta()},350);
+}
+function startCTA(){
+  if(ctaTimer)clearInterval(ctaTimer);
+  showCTA();ctaTimer=setInterval(showCTA,7000);
+}
+let likeGoal=1000,lastStats=null;
+function updateLikeBar(likes,views){
+  const box=$('likebar');
+  if(likes==null){box.style.display='none';return}
+  box.style.display='block';
+  const pct=Math.min(100,Math.round(likes/likeGoal*100));
+  box.innerHTML=`👍 ${likes.toLocaleString()} likes${views!=null?` • 👁 ${views.toLocaleString()} watching`:''}<br>
+    <span style="opacity:.8">Goal: ${likeGoal.toLocaleString()}</span>
+    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>`;
+}
+async function fetchStats(key,vid){
+  try{
+    const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,liveStreamingDetails&id=${vid}&key=${key}`);
+    const j=await r.json();
+    const it=j.items&&j.items[0];if(!it)return;
+    const likes=it.statistics&&it.statistics.likeCount!=null?+it.statistics.likeCount:null;
+    const views=it.liveStreamingDetails&&it.liveStreamingDetails.concurrentViewers!=null?+it.liveStreamingDetails.concurrentViewers:null;
+    updateLikeBar(likes,views);
+  }catch(e){}
+}
+
+/* ================= ROUNDS ================= */
+function newRound(){
+  round++;phase='play';t=0;rot=0;holes=[];lastOut=null;sdDone=false;SFX.start();lastMilestone=999;$('vignette').classList.remove('on');
+  $('win').style.display='none';
+  const n=Math.min(+$('n').value,LIST.length);
+  const pick=[...LIST].sort(()=>Math.random()-.5).slice(0,n);
+  const r=Math.max(8,Math.min(34,R*Math.sqrt(0.3/n)));
+  flags=pick.map(f=>{
+    const a=Math.random()*6.283,d=Math.random()*(R-r*2),sp=140+Math.random()*60,b=Math.random()*6.283;
+    return {...f,img:IMG[f.code],r,x:Math.cos(a)*d,y:Math.sin(a)*d,vx:Math.cos(b)*sp,vy:Math.sin(b)*sp,sp,alive:true,fall:0,lives:0,flash:0};
+  });
+}
+function endRound(f){
+  phase='win';lastChamp=f;
+  SFX.win();
+  setTimeout(()=>announceWinner(f),1600);
+  wins[f.code]=(wins[f.code]||0)+1;
+  try{localStorage.setItem('fbwins',JSON.stringify(wins))}catch(e){}
+  $('wimg').src=`https://flagcdn.com/w320/${f.code}.png`;$('wname').textContent=f.name;$('wround').textContent='Round '+round;
+  $('win').style.display='flex';
+  spawnConfetti();setTimeout(spawnConfetti,350);
+  $('champ').textContent='👑 Last champion: '+f.name;
+  renderBoard();
+  setTimeout(()=>{ if(Date.now()<sessionEnd) newRound(); else sessionOver(); },WIN_SHOW_MS);
+}
+function sessionOver(){
+  phase='over';
+  SFX.win();setTimeout(()=>speak('The stream is finished. Thank you for watching!'),1600);
+  const top=Object.entries(wins).sort((a,b)=>b[1]-a[1])[0];
+  $('wround').textContent='Stream finished — thanks for watching!';
+  if(top){$('wimg').src=`https://flagcdn.com/w320/${top[0]}.png`;$('wname').textContent='Most wins: '+BYCODE[top[0]].name}
+  $('win').style.display='flex';
+}
+function renderBoard(){
+  const rows=Object.entries(wins).sort((a,b)=>b[1]-a[1]).slice(0,3)
+    .map(([c,w])=>`<div>${BYCODE[c]?BYCODE[c].name:c}: ${w}</div>`).join('');
+  $('board').innerHTML='<b>🏆 Top</b>'+(rows||'<div>—</div>');
+}
+function startSession(){
+  const hrs=parseFloat($('hrs').value)||5;
+  sessionEnd=Date.now()+hrs*3600e3;
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
+  if(phase==='idle'||phase==='over')newRound();
+}
+
+/* ================= PHYSICS ================= */
+function inHole(theta){
+  for(const h of holes){
+    const d=((theta-h.a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+    if(Math.abs(d)<h.w/2)return true;
+  }
+  return false;
+}
+function bounce(f,d){
+  const nx=f.x/d,ny=f.y/d,dot=f.vx*nx+f.vy*ny;
+  if(dot>0){f.vx-=2*dot*nx;f.vy-=2*dot*ny}
+  f.x=nx*(R-f.r);f.y=ny*(R-f.r);
+}
+function update(dt){
+  t+=dt;rot+=SPIN*dt;
+  if(!sdDone&&t>=SUDDEN_DEATH){sdDone=true;SFX.siren();}
+  if(t>HOLE_START&&holes.length<Math.min(MAX_HOLES,Math.floor((t-HOLE_START)/HOLE_EVERY)+1))
+    {holes.push({a:Math.random()*6.283,w:0.22});SFX.hole();}
+  const grow=0.018+Math.max(0,t-90)*0.0015;  // holes widen slowly at first, a bit faster after 90s
+  holes.forEach(h=>h.w=Math.min(2.2,h.w+dt*grow));
+  const A=flags.filter(f=>f.alive);
+  for(const f of A){
+    if(f.flash>0)f.flash-=dt;
+    if(f.fall>0){f.fall+=dt*2;if(f.fall>=1)f.alive=false;continue}
+    f.x+=f.vx*dt;f.y+=f.vy*dt;
+    const d=Math.hypot(f.x,f.y);
+    if(d+f.r>R){
+      if(inHole(Math.atan2(f.y,f.x)-rot)){
+        if(d>R){
+          if(f.lives>0&&t<SUDDEN_DEATH){f.lives--;f.flash=0.6;bounce(f,d);SFX.save();popText(f.x,f.y-f.r-6,'SAVED!','#ffd54a');burst(f.x,f.y,'#ffd54a',8,120);}   // extra life saves it
+          else{f.fall=0.01;lastOut=f;SFX.fall();burst(f.x,f.y,'#ff4d6d',18);}
+        }
+      }else bounce(f,d);
+    }
+  }
+  const B=A.filter(f=>f.fall===0);
+  for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++){
+    const a=B[i],b=B[j],dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy),min=a.r+b.r;
+    if(dist<min&&dist>0){
+      const nx=dx/dist,ny=dy/dist,ov=(min-dist)/2;
+      a.x-=nx*ov;a.y-=ny*ov;b.x+=nx*ov;b.y+=ny*ov;
+      const p=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+      a.vx-=p*nx;a.vy-=p*ny;b.vx+=p*nx;b.vy+=p*ny;
+    }
+  }
+  for(const f of B){const s=Math.hypot(f.vx,f.vy)||1,k=f.sp/s;f.vx*=k;f.vy*=k}
+  const left=flags.filter(f=>f.alive);
+  if(left.length<=5&&left.length>1&&left.length<lastMilestone){
+    lastMilestone=left.length;
+    const el=$('final');el.classList.remove('show');void el.offsetWidth;
+    el.innerHTML=`<span class="big">FINAL ${left.length}</span><span class="sub">FLAGS REMAINING</span>`;
+    el.classList.add('show');
+    const fl=$('flash');fl.classList.remove('hit');void fl.offsetWidth;fl.classList.add('hit');
+    spawnShockwave('#ff2a2a');
+    SFX.milestone();
+  }
+  $('vignette').classList.toggle('on',left.length<=5&&left.length>1);
+  if(left.length===1&&left[0].fall===0)endRound(left[0]);
+  else if(left.length===0)endRound(lastOut||flags[0]);
+}
+
+/* ================= DRAW ================= */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const finalStretch=flags.filter(f=>f.alive).length<=5&&phase==='play';
+  const zoom=finalStretch?1+0.06*Math.min(1,(5-flags.filter(f=>f.alive).length)/4):1;
+  // ambient twinkling starfield behind everything
+  const maxD=Math.max(W,H)*0.7;
+  ctx.save();ctx.translate(cx,cy);ctx.scale(zoom,zoom);
+  for(const st of STARS){
+    const tw=0.4+0.6*Math.abs(Math.sin(t*1.5+st.tw));
+    ctx.globalAlpha=tw*0.5;ctx.fillStyle='#bcd6ff';
+    ctx.beginPath();ctx.arc(Math.cos(st.a+rot*0.15)*st.d*maxD,Math.sin(st.a+rot*0.15)*st.d*maxD,st.s,0,7);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // arena: radial gradient fill + soft outer glow
+  const glow=ctx.createRadialGradient(0,0,R*0.2,0,0,R*1.15);
+  glow.addColorStop(0,'#23305a');glow.addColorStop(0.75,'#141b2e');glow.addColorStop(1,'#0c1122');
+  ctx.save();ctx.shadowColor='#4ea1ff88';ctx.shadowBlur=35;
+  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fill();
+  ctx.restore();
+  // neon rim, glowing, skipping the open holes (turns red and pulses in the final stretch)
+  const pulse=finalStretch?0.6+0.4*Math.sin(t*6):1;
+  ctx.save();
+  ctx.shadowColor=finalStretch?`rgba(255,60,60,${pulse})`:'#7ec2ffcc';ctx.shadowBlur=finalStretch?28:18;
+  ctx.lineWidth=finalStretch?11:9;ctx.strokeStyle=finalStretch?`rgba(255,70,70,${pulse})`:'#7ec2ff';
+  ctx.lineCap='round';ctx.beginPath();
+  for(let i=0;i<360;i++){
+    const a=i/360*6.283;
+    if(inHole(a-rot))continue;
+    ctx.moveTo(Math.cos(a)*(R+5),Math.sin(a)*(R+5));
+    ctx.arc(0,0,R+5,a,(i+1.2)/360*6.283);
+  }
+  ctx.stroke();ctx.restore();
+  // red danger glow right at each hole's edges
+  ctx.save();ctx.shadowColor='#ff4d4d';ctx.shadowBlur=14;ctx.strokeStyle='#ff4d4dcc';ctx.lineWidth=4;
+  for(const h of holes){
+    for(const edge of [h.a-h.w/2+rot,h.a+h.w/2+rot]){
+      ctx.beginPath();ctx.moveTo(Math.cos(edge)*(R-6),Math.sin(edge)*(R-6));
+      ctx.lineTo(Math.cos(edge)*(R+14),Math.sin(edge)*(R+14));ctx.stroke();
+    }
+  }
+  ctx.restore();
+  for(const f of flags){
+    if(!f.alive)continue;
+    const s=f.fall>0?Math.max(0.05,1-f.fall):1,r=f.r*s;
+    // original flag shape: keeps each flag's real width:height ratio
+    const ok=f.img.complete&&f.img.naturalWidth;
+    const ratio=ok?f.img.naturalWidth/f.img.naturalHeight:1.5;
+    const B=(f.r/0.58)*s;
+    const fw=Math.min(B,0.7*B*ratio),fh=fw/ratio;
+    ctx.save();ctx.globalAlpha=f.fall>0?1-f.fall:1;
+    ctx.shadowColor=f.lives>0?'#ffd54a99':'#000a';ctx.shadowBlur=f.lives>0?16:8;ctx.shadowOffsetY=2;
+    if(ok)ctx.drawImage(f.img,f.x-fw/2,f.y-fh/2,fw,fh);
+    else{
+      ctx.fillStyle='#'+((f.code.charCodeAt(0)*9973+f.code.charCodeAt(1)*7919)%0xffffff).toString(16).padStart(6,'0');
+      ctx.fillRect(f.x-fw/2,f.y-fh/2,fw,fh);
+      ctx.fillStyle='#fff';ctx.font=`bold ${fh*0.6}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(f.code.toUpperCase(),f.x,f.y);
+    }
+    ctx.lineWidth=f.lives>0?3:1.5;
+    ctx.strokeStyle=f.flash>0?'#ff4d6d':(f.lives>0?'#ffd54a':'#ffffffcc');
+    ctx.strokeRect(f.x-fw/2,f.y-fh/2,fw,fh);
+    ctx.restore();
+    if(f.lives>0&&f.fall===0){
+      ctx.fillStyle='#ff4d6d';ctx.font=`bold ${Math.max(11,fh*0.8)}px Arial`;
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText('❤'+f.lives,f.x,f.y-fh/2-2);
+    }
+  }
+  ctx.restore();
+}
+function loop(now){
+  const dt=Math.min(0.033,(now-last)/1000);last=now;
+  if(phase==='play')update(dt);
+  updateFX(dt);
+  draw();
+  drawFX();
+  if(sessionEnd){
+    const ms=Math.max(0,sessionEnd-Date.now()),h=Math.floor(ms/3.6e6),m=Math.floor(ms%3.6e6/6e4),s=Math.floor(ms%6e4/1e3);
+    const leftN=flags.filter(f=>f.alive).length;
+    $('info').textContent=`Round ${round} • ${leftN} flags left • ends in ${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    $('info').classList.toggle('danger',phase==='play'&&leftN>0&&leftN<=6);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ================= COMMENTS -> EXTRA LIFE ================= */
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.']/g,' ').replace(/\s+/g,' ').trim();
+const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const KEYS=[];
+LIST.forEach(f=>KEYS.push([norm(f.name),f.code]));
+Object.entries(ALIAS).forEach(([k,c])=>KEYS.push([norm(k),c]));
+KEYS.sort((a,b)=>b[0].length-a[0].length);
+KEYS.forEach(k=>k.push(new RegExp('(?<![a-z])'+esc(k[0])+'(?![a-z])')));
+
+function findCode(text){
+  // 1) emoji flag like 🇧🇩
+  const em=text.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u);
+  if(em){
+    const code=[...em[0]].map(c=>String.fromCharCode(c.codePointAt(0)-0x1F1E6+97)).join('');
+    if(BYCODE[code])return code;
+  }
+  const s=norm(text);
+  // 2) exact 2-letter code as the whole message
+  if(s.length===2&&BYCODE[s])return s;
+  // 3) country name inside message
+  for(const [k,c,re] of KEYS)if(re.test(s))return c;
+  return null;
+}
+const cool=new Map();
+function feed(html){
+  const d=document.createElement('div');d.innerHTML=html;
+  const fd=$('feed');fd.insertBefore(d,fd.children[1]);
+  while(fd.children.length>8)fd.removeChild(fd.lastChild);
+}
+function handleComment(user,text){
+  const code=findCode(text);
+  if(!code||phase!=='play')return;
+  const f=flags.find(x=>x.code===code&&x.alive&&x.fall===0);
+  if(!f)return;
+  const now=Date.now();
+  if(now-(cool.get(user)||0)<USER_COOLDOWN*1000)return;
+  if(f.lives>=MAX_LIVES){feed(`⚠ ${f.name} already has max ❤`);return}
+  cool.set(user,now);f.lives++;f.flash=0.6;SFX.life();
+  const fb=$('feed').getBoundingClientRect(),st=$('stage').getBoundingClientRect();
+  spawnHeart(fb.left-st.left+20,fb.top-st.top+10,f.x+cx,f.y+cy);
+  popText(f.x,f.y-f.r-6,'+1 LIFE','#ff6b8a');
+  feed(`❤ <b>${f.name}</b> +1 life <span style="opacity:.7">— ${user.replace(/</g,'')}</span>`);
+}
+
+/* ================= YOUTUBE LIVE CHAT ================= */
+let chatId=null,pageToken=null,firstPoll=true,polling=false;
+const setStatus=s=>$('status').textContent='Chat: '+s;
+function parseVid(v){const m=v.match(/(?:v=|live\/|youtu\.be\/)([\w-]{11})/);return m?m[1]:v.trim()}
+let chatOn=true;
+function embedRealChat(vidId){
+  if(!chatOn||!vidId){$('ytchat').style.display='none';return}
+  if(location.protocol==='file:'){
+    $('ytchat').style.display='block';
+    $('ytchat').innerHTML='<span class="lbl">💬 Live chat</span>'+
+      '<div style="padding:34px 10px;font-size:11px;line-height:1.5;text-align:center;opacity:.85">'+
+      "Live chat can't embed from a double-clicked file.<br><br>Run a local server (see the Setup instructions) "+
+      'and open the game through that address instead, e.g. <b>http://localhost:8000/...</b></div>';
+    return;
+  }
+  const domain=location.hostname||'localhost';
+  $('ytchatframe').src=`https://www.youtube.com/live_chat?v=${vidId}&embed_domain=${domain}`;
+  $('ytchat').style.display='block';
+}
+async function connectChat(){
+  const vid=parseVid($('vid').value);
+  const key=$('key').value.trim();
+  if(!vid){setStatus('enter a stream URL above');return}
+  embedRealChat(vid);
+  if(!key){setStatus('chat shown ✔ (add an API key in Advanced for +1 life sync)');return}
+  fetchStats(key,vid);setInterval(()=>fetchStats(key,vid),30000);
+  try{
+    setStatus('connecting...');
+    const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${vid}&key=${key}`);
+    const j=await r.json();
+    if(j.error)throw new Error(j.error.message);
+    chatId=j.items[0].liveStreamingDetails.activeLiveChatId;
+    if(!chatId)throw new Error('no active live chat');
+    pageToken=null;firstPoll=true;
+    if(!polling){polling=true;poll(key)}
+    setStatus('connected ✔');
+  }catch(e){setStatus('error - '+e.message)}
+}
+async function poll(key){
+  let delay=POLL_MS;
+  try{
+    let url=`https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${chatId}&part=snippet,authorDetails&maxResults=200&key=${key}`;
+    if(pageToken)url+='&pageToken='+pageToken;
+    const j=await (await fetch(url)).json();
+    if(j.error)throw new Error(j.error.message);
+    pageToken=j.nextPageToken;
+    if(!firstPoll)for(const m of j.items||[]){
+      const txt=m.snippet.displayMessage||'';
+      handleComment(m.authorDetails.displayName,txt);
+    }
+    firstPoll=false;
+    delay=Math.max(POLL_MS,j.pollingIntervalMillis||0);
+    setStatus('connected ✔');
+  }catch(e){setStatus('retrying - '+e.message);delay=30000}
+  setTimeout(()=>poll(key),delay);
+}
+
+/* ================= UI ================= */
+try{const c=JSON.parse(localStorage.getItem('fbcfg')||'{}');$('key').value=c.key||'';$('vid').value=c.vid||'';$('hrs').value=c.hrs||5}catch(e){}
+$('gear').onclick=()=>{const s=$('setup');s.style.display=s.style.display==='block'?'none':'block'};
+$('conn').onclick=()=>{
+  try{localStorage.setItem('fbcfg',JSON.stringify({key:$('key').value,vid:$('vid').value,hrs:$('hrs').value}))}catch(e){}
+  startSession();connectChat();$('setup').style.display='none';
+};
+$('test').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value){handleComment('TestUser'+Math.random().toString(36).slice(2,5),e.target.value);e.target.value=''}});
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='h'||e.key==='H'){['ctl','setup'].forEach(i=>{const s=$(i).style;s.visibility=s.visibility==='hidden'?'visible':'hidden'})}
+  if(e.key==='f'||e.key==='F')toggleFull();
+  if(e.key==='p'||e.key==='P')togglePhone();
+  if(e.key==='e'||e.key==='E')toggleUI();
+});
+function toggleFull(){
+  if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+}
+document.addEventListener('fullscreenchange',()=>{$('full').textContent=document.fullscreenElement?'⤢':'⛶'});
+$('full').onclick=toggleFull;
+function togglePhone(){document.body.classList.toggle('phone');$('phone').style.opacity=document.body.classList.contains('phone')?1:0.55;resize()}
+$('phone').onclick=togglePhone;
+function toggleUI(){
+  const on=document.body.classList.toggle('hideui');
+  $('eye').textContent=on?'🙈':'👁';
+}
+$('eye').onclick=toggleUI;
+$('snd').onclick=()=>{soundOn=!soundOn;$('snd').textContent=soundOn?'🔊':'🔇';if(soundOn)ac();else try{speechSynthesis.cancel()}catch(e){}};
+$('voc').onclick=()=>{voiceOn=!voiceOn;$('voc').style.opacity=voiceOn?1:0.4;if(!voiceOn)try{speechSynthesis.cancel()}catch(e){}};
+$('vol').oninput=e=>vol=+e.target.value;
+function fillVoices(){
+  if(!('speechSynthesis' in window))return;
+  const vs=speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));
+  $('vsel').innerHTML='<option value="">Auto (best female voice)</option>'+vs.map(v=>`<option value="${v.name}">${v.name}</option>`).join('');
+  $('vsel').value=VCHOICE;
+}
+$('vsel').onchange=e=>{VCHOICE=e.target.value;try{localStorage.setItem('fbvoice',VCHOICE)}catch(er){}};
+$('ctaon').onchange=e=>{ctaOn=e.target.checked;if(!ctaOn)$('cta').classList.remove('show');};
+$('likegoal').onchange=e=>{likeGoal=Math.max(1,+e.target.value||1000);};
+$('advToggle').onclick=()=>{const b=$('advBox');b.style.display=b.style.display==='block'?'none':'block'};
+$('chaton').onchange=e=>{chatOn=e.target.checked;if(!chatOn)$('ytchat').style.display='none';else embedRealChat(parseVid($('vid').value||''))};
+$('vtest').onclick=()=>{const was=voiceOn;voiceOn=true;soundOn=true;speak('Round 1 complete! The champion is Bangladesh!');voiceOn=was};
+try{speechSynthesis.onvoiceschanged=fillVoices;fillVoices()}catch(e){}
+addEventListener('click',()=>ac());   // browsers need one click to allow audio
+try{speechSynthesis.getVoices()}catch(e){}
+renderBoard();startCTA();
+// show a demo round right away; the real 5-hour session starts when you press "Save & Start"
+sessionEnd=Date.now()+5*3600e3;newRound();
+requestAnimationFrame(t=>{last=t;requestAnimationFrame(loop)});
+</script>
+</body>
+</html>
